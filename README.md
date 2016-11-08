@@ -16,7 +16,7 @@ This plugin will allow you to configure Drill to directly query logfiles of any 
 ##Installation:
 This library has no dependencies, so simply build this using Maven by typing:
 `mvn clean install -DskipTests` 
-Next, go to the `targets/` directory and copy the `.jar` file to `<path to drill>/jars/3rdParty/`.  Alternatively you can directly download the `.jar` file from the releases page here:
+Next, go to the `targets/` directory and copy the `.jar` file to `<path to drill>/jars/3rdParty/`.  Alternatively you can directly download the `.jar` file from the releases page here: https://github.com/cgivre/drill-logfile-plugin/releases.
 
 ##Usage
 After installing the `.jar` file, go to the server configuration and add the following section in the `<extensions>` section of `dfs`.  In order to use the plugin, you will have to configure the `dfs` plugin on in your Storage Plugins section. 
