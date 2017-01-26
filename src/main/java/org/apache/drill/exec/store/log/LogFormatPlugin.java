@@ -91,6 +91,7 @@ public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatC
         public List<String> extensions;
         public List<String> fieldNames;
         public String pattern;
+        public Boolean errorOnMismatch = false;
 
         private static final List<String> DEFAULT_EXTS = ImmutableList.of("log");
 

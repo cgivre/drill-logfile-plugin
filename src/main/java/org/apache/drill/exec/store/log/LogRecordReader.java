@@ -102,6 +102,7 @@ public class LogRecordReader extends AbstractRecordReader {
 
                 List<String> fieldNames = config.fieldNames;
 
+                boolean errorOnMismatch = config.errorOnMismatch;
 
                 Matcher m = r.matcher(line);
 
@@ -110,25 +111,37 @@ public class LogRecordReader extends AbstractRecordReader {
                         "Invalid Regular Expression: No Capturing Groups" , 0
                     );
                 }
-                /*else if( m.groupCount() != (fieldNames.size() + 1)) {
+                else if( m.groupCount() != (fieldNames.size())) {
                     throw new ParseException(
-                        "Invalid Regular Expression: Field names do not match capturing groups" , 0
+                        "Invalid Regular Expression: Field names do not match capturing groups.  There are " + m.groupCount() + " captured groups in the data and " + fieldNames
+                            .size() + " specified in the configuration.", 0
                     );
-                }*/
+                }
 
                 if (m.find()) {
                     for( int i = 1; i <= m.groupCount(); i++ )
                     {
+                        //TODO Add option for date fields
                         String fieldName  = fieldNames.get(i - 1);
-                        String fieldValue = m.group(i);
+                        String fieldValue = "";
+                        try {
+                            fieldValue = m.group(i);
+                        } catch( Exception e) {
+                            fieldValue = "";
+                        }
                         byte[] bytes = fieldValue.getBytes("UTF-8");
                         this.buffer.setBytes(0, bytes, 0, bytes.length);
                         map.varChar(fieldName).writeVarChar(0, bytes.length, buffer);
                     }
                 } else {
-                   throw new ParseException(
-                        "Invalid Log format: " + inputPath + "\n" + lineCount + ":" + line, 0
-                   );
+                    if( errorOnMismatch ) {
+                        throw new ParseException("Line does not match pattern: " + inputPath + "\n" + lineCount + ":\n" + line, 0);
+                    } else {
+                        String fieldName = "unmatched_lines";
+                        byte[] bytes = line.getBytes("UTF-8");
+                        this.buffer.setBytes(0, bytes, 0, bytes.length);
+                        map.varChar(fieldName).writeVarChar(0, bytes.length, buffer);
+                    }
                 }
 
                 map.end();
