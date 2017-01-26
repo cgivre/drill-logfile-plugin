@@ -31,7 +31,7 @@ After installing the `.jar` file, go to the server configuration and add the fol
 ### Example Usage:
 The configuration below demonstrates how to configure Drill to query the example MySQL log file shown above.
 ```
-log": {
+"log": {
       "type": "log",
       "extensions": [
         "log"
