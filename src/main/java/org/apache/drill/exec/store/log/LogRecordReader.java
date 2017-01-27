@@ -40,8 +40,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.ParseException;
 import java.util.List;
-import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class LogRecordReader extends AbstractRecordReader {
@@ -65,7 +65,7 @@ public class LogRecordReader extends AbstractRecordReader {
             this.lineCount = 0;
             this.reader = new BufferedReader(new InputStreamReader(fsStream.getWrappedStream(), "UTF-8"));
             this.config = config;
-            this.buffer = fragmentContext.getManagedBuffer();
+            this.buffer = fragmentContext.getManagedBuffer(4096);
             setColumns(columns);
 
         } catch(IOException e){
@@ -123,15 +123,41 @@ public class LogRecordReader extends AbstractRecordReader {
                     {
                         //TODO Add option for date fields
                         String fieldName  = fieldNames.get(i - 1);
-                        String fieldValue = "";
-                        try {
-                            fieldValue = m.group(i);
-                        } catch( Exception e) {
+                        String fieldValue;
+
+                        fieldValue = m.group(i);
+
+                        if( fieldValue == null){
                             fieldValue = "";
                         }
                         byte[] bytes = fieldValue.getBytes("UTF-8");
-                        this.buffer.setBytes(0, bytes, 0, bytes.length);
-                        map.varChar(fieldName).writeVarChar(0, bytes.length, buffer);
+
+                        int stringLength = bytes.length;
+                        /*if( stringLength > 256 ){
+                            stringLength = 256;
+                        }*/
+
+
+                        /*
+                        java.text.DateFormat df = new java.text.SimpleDateFormat("yyMMdd HHmm");
+                        java.util.Date date;
+                        long file_creation_date = 0;
+                        try {
+                            date = df.parse(String.valueOf( creation_date + " " + creation_time));
+                            file_creation_date = date.getTime();
+                        } catch( Exception e) {
+
+                        }
+                        map.timeStamp("File_creation_date").writeTimeStamp(file_creation_date);
+                        */
+
+                        /*this.buffer.reallocIfNeeded(stringLength);
+                        this.buffer.setBytes(0, bytes, 0, stringLength);
+                        map.varChar(fieldName).writeVarChar(0, stringLength, buffer);*/
+
+
+                        this.buffer.setBytes(0, bytes, 0, stringLength);
+                        map.varChar(fieldName).writeVarChar(0, stringLength, buffer);
                     }
                 } else {
                     if( errorOnMismatch ) {
@@ -160,4 +186,17 @@ public class LogRecordReader extends AbstractRecordReader {
         this.reader.close();
     }
 
+    private long reformatDate( String d ){
+        long result = 0;
+        java.text.DateFormat df = new java.text.SimpleDateFormat("yyMMdd");
+        java.util.Date date;
+        try {
+            date = df.parse(String.valueOf(d));
+            result = date.getTime();
+        } catch( Exception e) {
+
+        }
+
+        return result;
+    }
 }
