@@ -26,11 +26,12 @@ After installing the `.jar` file, go to the server configuration and add the fol
 * **`fieldNames`**:  This is a list of field names which you are extracting. Note that you must have the same number of fields as extracting groups in your pattern.
 * **`type`**:  This tells Drill which extension to use.  In this case, it must be `log`.
 * **`extensions`**:  This option tells Drill which file extensions should be mapped to this configuration.  Note that you can have multiple configurations of this plugin to allow you to query various log files.
+* **`errorOnMismatch`**:  False by default, but allows the option of either throwing an error on lines that don't match the pattern or dumping the line to a field called `unmatched_lines` when false.
 
 ### Example Usage:
 The configuration below demonstrates how to configure Drill to query the example MySQL log file shown above.
 ```
-log": {
+"log": {
       "type": "log",
       "extensions": [
         "log"
@@ -42,7 +43,8 @@ log": {
         "action",
         "query"
       ],
-      "pattern": "(\\d{6})\\s(\\d{2}:\\d{2}:\\d{2})\\s+(\\d+)\\s(\\w+)\\s+(.+)"
+      "pattern": "(\\d{6})\\s(\\d{2}:\\d{2}:\\d{2})\\s+(\\d+)\\s(\\w+)\\s+(.+)",
+      "errorOnMismatch": false
     }
   }
  ```
