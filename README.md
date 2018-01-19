@@ -13,17 +13,20 @@ If you wanted to analyze log files such as the MySQL log sample shown below usin
 ```
 This plugin will allow you to configure Drill to directly query logfiles of any configuration.
 
-##Installation:
+## Installation:
 This library has no dependencies, so simply build this using Maven by typing:
 `mvn clean install -DskipTests` 
 Next, go to the `targets/` directory and copy the `.jar` file to `<path to drill>/jars/3rdParty/`.  Alternatively you can directly download the `.jar` file from the releases page here: https://github.com/cgivre/drill-logfile-plugin/releases.
 
-##Usage
+## Usage
 After installing the `.jar` file, go to the server configuration and add the following section in the `<extensions>` section of `dfs`.  In order to use the plugin, you will have to configure the `dfs` plugin on in your Storage Plugins section. 
 
 ### Configuration Options
 * **`pattern`**:  This is the regular expression which defines how the log file lines will be split.  You must enclose the parts of the regex in grouping parentheses that you wish to extract.  Note that this plugin uses Java regular expressions and requires that shortcuts such as `\d` have an additional slash:  ie `\\d`.
 * **`fieldNames`**:  This is a list of field names which you are extracting. Note that you must have the same number of fields as extracting groups in your pattern.
+* **`dataTypes`**:  This field allows you to define the data types for all the fields extracted from your log.  You may either leave the list blank entirely, in which case all fields will be interpreted as `VARCHAR` or you must define a data tyoe for every field.  At this time, it supports: `INT` or `INTEGER`, `DOUBLE` or `FLOAT8`, `FLOAT` or  `FLOAT4`, `VARCHAR`, `DATE`, `TIME`, and `TIMESTAMP`.
+* **`dateFormat`**:   This defines the default date format which will be used to parse dates.  Leave blank if not needed.
+* **`timeFormat`**:   This defines the default time format which will be used to parse time.  Leave blank if not needed.
 * **`type`**:  This tells Drill which extension to use.  In this case, it must be `log`.
 * **`extensions`**:  This option tells Drill which file extensions should be mapped to this configuration.  Note that you can have multiple configurations of this plugin to allow you to query various log files.
 * **`errorOnMismatch`**:  False by default, but allows the option of either throwing an error on lines that don't match the pattern or dumping the line to a field called `unmatched_lines` when false.
