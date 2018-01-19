@@ -42,7 +42,7 @@ import java.util.List;
 
 public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatConfig> {
 
-  private static final boolean IS_COMPRESSIBLE = false;
+  private static final boolean IS_COMPRESSIBLE = true;
   private static final String DEFAULT_NAME = "log";
   private LogFormatConfig config;
 
