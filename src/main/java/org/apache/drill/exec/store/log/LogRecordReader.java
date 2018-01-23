@@ -1,5 +1,32 @@
 package org.apache.drill.exec.store.log;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.drill.common.exceptions.ExecutionSetupException;
+import org.apache.drill.common.exceptions.UserException;
+import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.exception.OutOfMemoryException;
+import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.ops.OperatorContext;
+import org.apache.drill.exec.physical.impl.OutputMutator;
+import org.apache.drill.exec.store.AbstractRecordReader;
+import org.apache.drill.exec.store.dfs.DrillFileSystem;
+import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
+import org.apache.drill.exec.vector.complex.writer.BaseWriter;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.CompressionCodecFactory;
+import org.apache.hadoop.io.compress.CompressionInputStream;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,27 +47,6 @@ package org.apache.drill.exec.store.log;
 
 
 import io.netty.buffer.DrillBuf;
-import org.apache.drill.common.exceptions.ExecutionSetupException;
-import org.apache.drill.common.exceptions.UserException;
-import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.exception.OutOfMemoryException;
-import org.apache.drill.exec.ops.FragmentContext;
-import org.apache.drill.exec.ops.OperatorContext;
-import org.apache.drill.exec.physical.impl.OutputMutator;
-import org.apache.drill.exec.store.AbstractRecordReader;
-import org.apache.drill.exec.store.dfs.DrillFileSystem;
-import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
-import org.apache.drill.exec.vector.complex.writer.BaseWriter;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.Path;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 public class LogRecordReader extends AbstractRecordReader {
@@ -63,10 +69,19 @@ public class LogRecordReader extends AbstractRecordReader {
   public LogRecordReader(FragmentContext fragmentContext, String inputPath, DrillFileSystem fileSystem,
                          List<SchemaPath> columns, LogFormatPlugin.LogFormatConfig config) throws OutOfMemoryException {
     try {
-      FSDataInputStream fsStream = fileSystem.open(new Path(inputPath));
+    	  Path hdfsPath = new Path(inputPath);  
+    	  Configuration conf = new Configuration();  
+      FSDataInputStream fsStream = fileSystem.open(hdfsPath);
+      CompressionCodecFactory factory = new CompressionCodecFactory(conf);  
+      CompressionCodec codec = factory.getCodec(hdfsPath);  
+      if (codec == null) {
+    	  	reader = new BufferedReader(new InputStreamReader(fsStream.getWrappedStream(), "UTF-8"));
+      } else {
+    	  	CompressionInputStream comInputStream = codec.createInputStream(fsStream.getWrappedStream());
+		reader = new BufferedReader(new InputStreamReader(comInputStream));
+      }
       this.inputPath = inputPath;
       this.lineCount = 0;
-      this.reader = new BufferedReader(new InputStreamReader(fsStream.getWrappedStream(), "UTF-8"));
       this.config = config;
       this.buffer = fragmentContext.getManagedBuffer(4096);
       setColumns(columns);
