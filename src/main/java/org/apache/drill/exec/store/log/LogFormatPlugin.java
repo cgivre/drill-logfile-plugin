@@ -91,8 +91,8 @@ public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatC
     public List<String> dataTypes;
     public String pattern;
     public Boolean errorOnMismatch = false;
-    public String dateFormat;
-    public String timeFormat;
+    public String dateFormat = null;
+    public String timeFormat = null;
 
     private static final List<String> DEFAULT_EXTS = ImmutableList.of("log");
 

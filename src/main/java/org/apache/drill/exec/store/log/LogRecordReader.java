@@ -1,14 +1,6 @@
 package org.apache.drill.exec.store.log;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
+import io.netty.buffer.DrillBuf;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
@@ -26,6 +18,15 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.CompressionInputStream;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -46,9 +47,6 @@ import org.apache.hadoop.io.compress.CompressionInputStream;
  */
 
 
-import io.netty.buffer.DrillBuf;
-
-
 public class LogRecordReader extends AbstractRecordReader {
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LogRecordReader.class);
@@ -65,6 +63,8 @@ public class LogRecordReader extends AbstractRecordReader {
   private List<String> fieldNames;
   private List<String> dataTypes;
   private boolean errorOnMismatch;
+  private String dateFormat;
+  private String timeFormat;
 
   public LogRecordReader(FragmentContext fragmentContext, String inputPath, DrillFileSystem fileSystem,
                          List<SchemaPath> columns, LogFormatPlugin.LogFormatConfig config) throws OutOfMemoryException {
@@ -97,6 +97,9 @@ public class LogRecordReader extends AbstractRecordReader {
     r = Pattern.compile(regex);
     fieldNames = config.fieldNames;
     dataTypes = config.dataTypes;
+    dateFormat = config.dateFormat;
+    timeFormat = config.timeFormat;
+
     errorOnMismatch = config.errorOnMismatch;
   }
 
