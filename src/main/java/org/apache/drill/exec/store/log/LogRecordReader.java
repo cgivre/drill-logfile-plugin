@@ -5,6 +5,7 @@ import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.exception.OutOfMemoryException;
+import org.apache.drill.exec.expr.fn.impl.DateUtility;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
@@ -65,20 +66,23 @@ public class LogRecordReader extends AbstractRecordReader {
   private boolean errorOnMismatch;
   private String dateFormat;
   private String timeFormat;
+  private java.text.DateFormat df;
+  private java.text.DateFormat tf;
+  private long time;
 
   public LogRecordReader(FragmentContext fragmentContext, String inputPath, DrillFileSystem fileSystem,
                          List<SchemaPath> columns, LogFormatPlugin.LogFormatConfig config) throws OutOfMemoryException {
     try {
-    	  Path hdfsPath = new Path(inputPath);  
-    	  Configuration conf = new Configuration();  
+      Path hdfsPath = new Path(inputPath);
+      Configuration conf = new Configuration();
       FSDataInputStream fsStream = fileSystem.open(hdfsPath);
-      CompressionCodecFactory factory = new CompressionCodecFactory(conf);  
-      CompressionCodec codec = factory.getCodec(hdfsPath);  
+      CompressionCodecFactory factory = new CompressionCodecFactory(conf);
+      CompressionCodec codec = factory.getCodec(hdfsPath);
       if (codec == null) {
-    	  	reader = new BufferedReader(new InputStreamReader(fsStream.getWrappedStream(), "UTF-8"));
+        reader = new BufferedReader(new InputStreamReader(fsStream.getWrappedStream(), "UTF-8"));
       } else {
-    	  	CompressionInputStream comInputStream = codec.createInputStream(fsStream.getWrappedStream());
-		reader = new BufferedReader(new InputStreamReader(comInputStream));
+        CompressionInputStream comInputStream = codec.createInputStream(fsStream.getWrappedStream());
+        reader = new BufferedReader(new InputStreamReader(comInputStream));
       }
       this.inputPath = inputPath;
       this.lineCount = 0;
@@ -95,12 +99,23 @@ public class LogRecordReader extends AbstractRecordReader {
     this.writer = new VectorContainerWriter(output);
     String regex = config.pattern;
     r = Pattern.compile(regex);
+
     fieldNames = config.fieldNames;
     dataTypes = config.dataTypes;
     dateFormat = config.dateFormat;
     timeFormat = config.timeFormat;
-
     errorOnMismatch = config.errorOnMismatch;
+
+    //Set up date formats
+    //TODO Check for invalid format strings
+    if(dateFormat != null && !dateFormat.isEmpty()) {
+      df = new java.text.SimpleDateFormat(dateFormat);
+    }
+
+    if(timeFormat !=null && !timeFormat.isEmpty()) {
+      tf = new java.text.SimpleDateFormat(timeFormat);
+    }
+
   }
 
   public int next() {
@@ -126,6 +141,7 @@ public class LogRecordReader extends AbstractRecordReader {
 
         Matcher m = r.matcher(line);
 
+        //TODO Move this to setup
         if (m.groupCount() == 0) {
           throw new ParseException(
               "Invalid Regular Expression: No Capturing Groups", 0
@@ -136,7 +152,7 @@ public class LogRecordReader extends AbstractRecordReader {
         } else if ((dataTypes == null) || m.groupCount() != dataTypes.size()) {
           //If the number of data types is not correct, create a list of varchar
           dataTypes = new ArrayList<String>();
-          for( int i =-0; i < m.groupCount(); i++ ){
+          for (int i = -0; i < m.groupCount(); i++) {
             dataTypes.add("VARCHAR");
           }
         }
@@ -145,7 +161,7 @@ public class LogRecordReader extends AbstractRecordReader {
           for (int i = 1; i <= m.groupCount(); i++) {
 
             String fieldName = fieldNames.get(i - 1);
-            String type = dataTypes.get(i-1);
+            String type = dataTypes.get(i - 1);
             String fieldValue;
 
             fieldValue = m.group(i);
@@ -154,33 +170,47 @@ public class LogRecordReader extends AbstractRecordReader {
               fieldValue = "";
             }
 
-            if( type.equals("INT") || type.equals("INTEGER") ){
+            if (type.equals("INT") || type.equals("INTEGER")) {
               map.integer(fieldName).writeInt(Integer.parseInt(fieldValue));
-            } else if( type.equals("DOUBLE") || type.equals("FLOAT8")) {
+            } else if (type.equals("DOUBLE") || type.equals("FLOAT8")) {
               map.float8(fieldName).writeFloat8(Double.parseDouble(fieldValue));
-            } else if( type.equals("FLOAT") || type.equals("FLOAT4")) {
+            } else if (type.equals("FLOAT") || type.equals("FLOAT4")) {
               map.float4(fieldName).writeFloat4(Float.parseFloat(fieldValue));
-            } else if( type.equals("DATE")) {
-              //map.date(fieldName).writeDate();
-            } else if( type.equals("TIMESTAMP")) {
-              //map.timeStamp(fieldName).writeTimeStamp( );
-            } else if( type.equals("TIME") || type.equals("FLOAT8")) {
-              //map.time(fieldName).writeTime( );
+            } else if (type.equals("DATE")) {
+              try {
+                java.util.Date d = df.parse(fieldValue);
+                long milliseconds = d.getTime();
+                map.date(fieldName).writeDate(milliseconds);
+              } catch (ParseException e) {
+                if (errorOnMismatch) {
+                  throw new ParseException(
+                      "Date Format String " + dateFormat + " does not match date string " + fieldValue + " on line " + lineCount + ".", 0
+                  );
+                }
+              }
+            } else if (type.equals("TIMESTAMP")) {
+              try {
+                java.util.Date d = df.parse(fieldValue);
+                long milliseconds = d.getTime();
+                map.timeStamp(fieldName).writeTimeStamp(milliseconds);
+              } catch (ParseException e) {
+                if (errorOnMismatch) {
+                  throw new ParseException(
+                      "Date Format String " + dateFormat + " does not match date string " + fieldValue + " on line " + lineCount + ".", 0
+                  );
+                }
+              }
+            } else if (type.equals("TIME")) {
+              java.util.Date t = tf.parse(fieldValue);
+
+              //TODO Update with non-deprecated methods
+              int milliseconds = (int)((t.getHours() * org.apache.drill.exec.expr.fn.impl.DateUtility.hoursToMillis) +
+                  (t.getMinutes() *  org.apache.drill.exec.expr.fn.impl.DateUtility.minutesToMillis) +
+                  (t.getSeconds() * DateUtility.secondsToMillis));
+
+              map.time(fieldName).writeTime(milliseconds);
             } else {
               byte[] bytes = fieldValue.getBytes("UTF-8");
-
-                        /*
-                        java.text.DateFormat df = new java.text.SimpleDateFormat("yyMMdd HHmm");
-                        java.util.Date date;
-                        long file_creation_date = 0;
-                        try {
-                            date = df.parse(String.valueOf( creation_date + " " + creation_time));
-                            file_creation_date = date.getTime();
-                        } catch( Exception e) {
-
-                        }
-                        map.timeStamp("File_creation_date").writeTimeStamp(file_creation_date);
-                        */
 
               int stringLength = bytes.length;
               this.buffer.setBytes(0, bytes, 0, stringLength);
