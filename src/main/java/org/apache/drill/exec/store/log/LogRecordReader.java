@@ -18,13 +18,11 @@ package org.apache.drill.exec.store.log;
  * limitations under the License.
  */
 
-
 import io.netty.buffer.DrillBuf;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.exception.OutOfMemoryException;
-import org.apache.drill.exec.expr.fn.impl.DateUtility;
 import org.apache.drill.exec.ops.FragmentContextImpl;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
@@ -99,7 +97,7 @@ public class LogRecordReader extends AbstractRecordReader {
   public void setup(final OperatorContext context, final OutputMutator output) throws ExecutionSetupException {
     this.writer = new VectorContainerWriter(output);
     String regex = config.getPattern();
-    r = Pattern.compile(regex);
+
 
     fieldNames = config.getFieldNames();
     dataTypes = config.getDataTypes();
@@ -116,13 +114,28 @@ public class LogRecordReader extends AbstractRecordReader {
     5.  Incorrect number of data types
     6.  Invalid data types
      */
-    //(\\d{6})\\s(\\d{2}:\\d{2}:\\d{2})\\s+(\\d+)\\s(\\w+)\\s+(.+)
-    if( regex.isEmpty() ){
+    if (regex.isEmpty()) {
       throw UserException.parseError().message("Log parser requires a valid, non-empty regex in the plugin configuration").build(logger);
+    } else {
+      //TODO Check for invalid regex
+      r = Pattern.compile(regex);
+      Matcher m = r.matcher("test");
+      if (m.groupCount() == 0) {
+        throw UserException.parseError().message("Invalid Regular Expression: No Capturing Groups", 0).build(logger);
+      } else if (m.groupCount() != (fieldNames.size())) {
+        throw UserException.parseError().message("Invalid Regular Expression: Field names do not match capturing groups.  There are " + m.groupCount() + " captured groups in the data and " + fieldNames.size() + " specified in the configuration.", 0).build(logger);
+
+      } else if ((dataTypes == null) || m.groupCount() != dataTypes.size()) {
+        //If the number of data types is not correct, create a list of varchar
+        dataTypes = new ArrayList<String>();
+        for (int i = -0; i < m.groupCount(); i++) {
+          dataTypes.add("VARCHAR");
+        }
+      }
     }
 
-    //Set up date formats
-    if( dataTypes.contains("DATE") || dataTypes.contains("TIMESTAMP")) {
+    //Check and set up date formats
+    if (dataTypes.contains("DATE") || dataTypes.contains("TIMESTAMP")) {
       if (dateFormat != null && !dateFormat.isEmpty()) {
         df = new java.text.SimpleDateFormat(dateFormat);
       } else {
@@ -130,7 +143,7 @@ public class LogRecordReader extends AbstractRecordReader {
       }
     }
 
-    if( dataTypes.contains("TIME")) {
+    if (dataTypes.contains("TIME")) {
       if (timeFormat != null && !timeFormat.isEmpty()) {
         tf = new java.text.SimpleDateFormat(timeFormat);
       } else {
@@ -162,23 +175,6 @@ public class LogRecordReader extends AbstractRecordReader {
         map.start();
 
         Matcher m = r.matcher(line);
-
-        //TODO Move this to setup
-        if (m.groupCount() == 0) {
-          throw new ParseException(
-              "Invalid Regular Expression: No Capturing Groups", 0
-          );
-        } else if (m.groupCount() != (fieldNames.size())) {
-          throw new ParseException(
-              "Invalid Regular Expression: Field names do not match capturing groups.  There are " + m.groupCount() + " captured groups in the data and " + fieldNames.size() + " specified in the configuration.", 0);
-        } else if ((dataTypes == null) || m.groupCount() != dataTypes.size()) {
-          //If the number of data types is not correct, create a list of varchar
-          dataTypes = new ArrayList<String>();
-          for (int i = -0; i < m.groupCount(); i++) {
-            dataTypes.add("VARCHAR");
-          }
-        }
-
         if (m.find()) {
           for (int i = 1; i <= m.groupCount(); i++) {
 
@@ -225,14 +221,13 @@ public class LogRecordReader extends AbstractRecordReader {
             } else if (type.toUpperCase().equals("TIME")) {
               java.util.Date t = tf.parse(fieldValue);
 
-              int milliseconds = (int)((t.getHours() * 3600000) +
-                  (t.getMinutes() *  60000) +
+              int milliseconds = (int) ((t.getHours() * 3600000) +
+                  (t.getMinutes() * 60000) +
                   (t.getSeconds() * 1000));
 
               map.time(fieldName).writeTime(milliseconds);
             } else {
               byte[] bytes = fieldValue.getBytes("UTF-8");
-
               int stringLength = bytes.length;
               this.buffer.setBytes(0, bytes, 0, stringLength);
               map.varChar(fieldName).writeVarChar(0, stringLength, buffer);
