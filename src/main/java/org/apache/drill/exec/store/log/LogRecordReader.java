@@ -1,11 +1,31 @@
 package org.apache.drill.exec.store.log;
 
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
 import io.netty.buffer.DrillBuf;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.expr.fn.impl.DateUtility;
+import org.apache.drill.exec.ops.FragmentContextImpl;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
@@ -28,25 +48,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 
 public class LogRecordReader extends AbstractRecordReader {
 
@@ -97,23 +98,44 @@ public class LogRecordReader extends AbstractRecordReader {
 
   public void setup(final OperatorContext context, final OutputMutator output) throws ExecutionSetupException {
     this.writer = new VectorContainerWriter(output);
-    String regex = config.pattern;
+    String regex = config.getPattern();
     r = Pattern.compile(regex);
 
-    fieldNames = config.fieldNames;
-    dataTypes = config.dataTypes;
-    dateFormat = config.dateFormat;
-    timeFormat = config.timeFormat;
-    errorOnMismatch = config.errorOnMismatch;
+    fieldNames = config.getFieldNames();
+    dataTypes = config.getDataTypes();
+    dateFormat = config.getDateFormat();
+    timeFormat = config.getTimeFormat();
+    errorOnMismatch = config.getErrorOnMismatch();
 
-    //Set up date formats
-    //TODO Check for invalid format strings
-    if(dateFormat != null && !dateFormat.isEmpty()) {
-      df = new java.text.SimpleDateFormat(dateFormat);
+    /*
+    This section will check for;
+    1.  Empty regex
+    2.  Invalid Regex
+    3.  Empty date string if the date format is used
+    4.  No capturing groups in the regex
+    5.  Incorrect number of data types
+    6.  Invalid data types
+     */
+    //(\\d{6})\\s(\\d{2}:\\d{2}:\\d{2})\\s+(\\d+)\\s(\\w+)\\s+(.+)
+    if( regex.isEmpty() ){
+      throw UserException.parseError().message("Log parser requires a valid, non-empty regex in the plugin configuration").build(logger);
     }
 
-    if(timeFormat !=null && !timeFormat.isEmpty()) {
-      tf = new java.text.SimpleDateFormat(timeFormat);
+    //Set up date formats
+    if( dataTypes.contains("DATE") || dataTypes.contains("TIMESTAMP")) {
+      if (dateFormat != null && !dateFormat.isEmpty()) {
+        df = new java.text.SimpleDateFormat(dateFormat);
+      } else {
+        throw new java.time.DateTimeException("Invalid date format.  The date formatting string was empty.  Please specify a valid date format string in the configuration for this data source.");
+      }
+    }
+
+    if( dataTypes.contains("TIME")) {
+      if (timeFormat != null && !timeFormat.isEmpty()) {
+        tf = new java.text.SimpleDateFormat(timeFormat);
+      } else {
+        throw new java.time.DateTimeException("Invalid time format.  The time formatting string was empty.  Please specify a valid time format string in the configuration for this data source.");
+      }
     }
 
   }
@@ -170,13 +192,13 @@ public class LogRecordReader extends AbstractRecordReader {
               fieldValue = "";
             }
 
-            if (type.equals("INT") || type.equals("INTEGER")) {
+            if (type.toUpperCase().equals("INT") || type.toUpperCase().equals("INTEGER")) {
               map.integer(fieldName).writeInt(Integer.parseInt(fieldValue));
-            } else if (type.equals("DOUBLE") || type.equals("FLOAT8")) {
+            } else if (type.toUpperCase().equals("DOUBLE") || type.toUpperCase().equals("FLOAT8")) {
               map.float8(fieldName).writeFloat8(Double.parseDouble(fieldValue));
-            } else if (type.equals("FLOAT") || type.equals("FLOAT4")) {
+            } else if (type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("FLOAT4")) {
               map.float4(fieldName).writeFloat4(Float.parseFloat(fieldValue));
-            } else if (type.equals("DATE")) {
+            } else if (type.toUpperCase().equals("DATE")) {
               try {
                 java.util.Date d = df.parse(fieldValue);
                 long milliseconds = d.getTime();
@@ -188,7 +210,7 @@ public class LogRecordReader extends AbstractRecordReader {
                   );
                 }
               }
-            } else if (type.equals("TIMESTAMP")) {
+            } else if (type.toUpperCase().equals("TIMESTAMP")) {
               try {
                 java.util.Date d = df.parse(fieldValue);
                 long milliseconds = d.getTime();
@@ -200,13 +222,12 @@ public class LogRecordReader extends AbstractRecordReader {
                   );
                 }
               }
-            } else if (type.equals("TIME")) {
+            } else if (type.toUpperCase().equals("TIME")) {
               java.util.Date t = tf.parse(fieldValue);
 
-              //TODO Update with non-deprecated methods
-              int milliseconds = (int)((t.getHours() * org.apache.drill.exec.expr.fn.impl.DateUtility.hoursToMillis) +
-                  (t.getMinutes() *  org.apache.drill.exec.expr.fn.impl.DateUtility.minutesToMillis) +
-                  (t.getSeconds() * DateUtility.secondsToMillis));
+              int milliseconds = (int)((t.getHours() * 3600000) +
+                  (t.getMinutes() *  60000) +
+                  (t.getSeconds() * 1000));
 
               map.time(fieldName).writeTime(milliseconds);
             } else {
@@ -242,19 +263,5 @@ public class LogRecordReader extends AbstractRecordReader {
 
   public void close() throws Exception {
     this.reader.close();
-  }
-
-  private long reformatDate(String d) {
-    long result = 0;
-    java.text.DateFormat df = new java.text.SimpleDateFormat("yyMMdd");
-    java.util.Date date;
-    try {
-      date = df.parse(String.valueOf(d));
-      result = date.getTime();
-    } catch (Exception e) {
-
-    }
-
-    return result;
   }
 }

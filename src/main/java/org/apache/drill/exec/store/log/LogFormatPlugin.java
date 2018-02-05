@@ -63,7 +63,6 @@ public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatC
     return new LogRecordReader(context, fileWork.getPath(), dfs, columns, config);
   }
 
-
   @Override
   public int getReaderOperatorType() {
     return UserBitShared.CoreOperatorType.JSON_SUB_SCAN_VALUE;
@@ -102,6 +101,31 @@ public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatC
         return DEFAULT_EXTS;
       }
       return extensions;
+    }
+
+    public List<String> getFieldNames() {
+      return fieldNames;
+    }
+
+    public List<String> getDataTypes() {
+      return dataTypes;
+    }
+
+    public String getDateFormat() {
+      return dateFormat;
+    }
+
+    public String getTimeFormat() {
+
+      return timeFormat;
+    }
+
+    public String getPattern() {
+      return pattern;
+    }
+
+    public Boolean getErrorOnMismatch() {
+      return errorOnMismatch;
     }
 
     @Override
