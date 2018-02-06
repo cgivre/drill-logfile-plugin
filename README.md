@@ -34,21 +34,15 @@ After installing the `.jar` file, go to the server configuration and add the fol
 ### Example Usage:
 The configuration below demonstrates how to configure Drill to query the example MySQL log file shown above.
 ```
-"log": {
-      "type": "log",
-      "extensions": [
-        "log"
-      ],
-      "fieldNames": [
-        "date",
-        "time",
-        "pid",
-        "action",
-        "query"
-      ],
-      "pattern": "(\\d{6})\\s(\\d{2}:\\d{2}:\\d{2})\\s+(\\d+)\\s(\\w+)\\s+(.+)",
-      "errorOnMismatch": false
-    }
-  }
+"log" : {
+      "type" : "log",
+      "extensions" : [ "log" ],
+      "fieldNames" : [ "date", "time", "pid", "action", "query" ],
+      "dataTypes" : [ "DATE", "TIME", "INT", "VARCHAR", "VARCHAR" ],
+      "dateFormat" : "yyMMdd",
+      "timeFormat" : "HH:mm:ss",
+      "pattern" : "(\\d{6})\\s(\\d{2}:\\d{2}:\\d{2})\\s+(\\d+)\\s(\\w+)\\s+(.+)",
+      "errorOnMismatch" : false
+      }
  ```
 
