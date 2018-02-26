@@ -1,5 +1,3 @@
-package org.apache.drill.exec.store.log;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +16,7 @@ package org.apache.drill.exec.store.log;
  * limitations under the License.
  */
 
+package org.apache.drill.exec.store.log;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonTypeName;
@@ -38,6 +37,7 @@ import org.apache.drill.exec.store.dfs.easy.FileWork;
 import org.apache.hadoop.conf.Configuration;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatConfig> {
@@ -90,7 +90,7 @@ public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatC
     public List<String> dataTypes;
     public String dateFormat = "";
     public String timeFormat = "HH:mm:ss";
-    public String pattern;
+    public String pattern = "(.*)";
     public Boolean errorOnMismatch = false;
 
     private static final List<String> DEFAULT_EXTS = ImmutableList.of("log");
@@ -104,6 +104,7 @@ public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatC
     }
 
     public List<String> getFieldNames() {
+      //For default case
       return fieldNames;
     }
 
@@ -116,7 +117,6 @@ public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatC
     }
 
     public String getTimeFormat() {
-
       return timeFormat;
     }
 
@@ -130,22 +130,7 @@ public class LogFormatPlugin extends EasyFormatPlugin<LogFormatPlugin.LogFormatC
 
     @Override
     public int hashCode() {
-      int result = pattern != null ? pattern.hashCode() : 0;
-      result = 31 * result + (dateFormat != null ? dateFormat.hashCode() : 0) + (timeFormat != null ? timeFormat.hashCode() : 0);
-      return result;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (this == obj) {
-        return true;
-      } else if (obj == null) {
-        return false;
-      } else if (getClass() == obj.getClass()) {
-        return true;
-      }
-      return false;
+      return Arrays.hashCode(new Object[] {extensions, fieldNames, dataTypes, dateFormat,timeFormat,pattern,errorOnMismatch});
     }
   }
-
 }
