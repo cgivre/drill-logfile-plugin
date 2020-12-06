@@ -1,3 +1,5 @@
+# UPDATE: THIS PLUGIN IS NOW PART OF APACHE DRILL (As of version 1.16)
+
 
 # Drill Logfile Plugin
 Plugin for Apache Drill that allows Drill to read and query log files of any format. 
